@@ -472,32 +472,44 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
     """Search university knowledge base with flexible matching"""
     query_lower = query.lower()
     
-    # Define keywords for each category in UNIVERSITY_KB
+    # Define keywords for each category in UNIVERSITY_KB - ordered by specificity
     keyword_mapping = {
+        "fees": ["fees", "cost", "tuition", "charge", "price", "expense", "fee"],  # More specific first
         "admissions": ["admission", "apply", "enroll", "register", "join", "entry", "eligibility", "deadline", "exam"],
-        "courses": ["course", "program", "engineering", "btech", "mba", "management", "bsc", "science", "ba", "arts"],
         "placements": ["placement", "job", "recruit", "company", "career", "package", "salary"],
-        "scholarships": ["scholarship", "financial", "aid", "grant", "fund", "fee", "waiver"],
+        "scholarships": ["scholarship", "financial", "aid", "grant", "fund", "waiver"],
         "hostel": ["hostel", "accommodation", "dorm", "mess", "facility", "housing", "stay"],
-        "fees": ["fee", "fees", "cost", "tuition", "charge", "price", "expense"],
+        "courses": ["course", "program", "engineering", "btech", "mba", "management", "bsc", "science", "ba", "arts"],
     }
     
-    # First try keyword-based matching for categories
+    # First try keyword-based matching for categories - prioritize exact phrase matches
+    best_match = None
+    best_match_length = 0
+    
     for category, keywords in keyword_mapping.items():
         for keyword in keywords:
-            if keyword in query_lower:
-                if category in UNIVERSITY_KB:
-                    items = UNIVERSITY_KB[category]
-                    content_list = []
-                    if isinstance(items, dict):
-                        for key, value in items.items():
-                            content_list.append(f"{key}: {value}")
-                    formatted_content = " | ".join(content_list) if content_list else str(items)
-                    return {
-                        "source": "University Knowledge",
-                        "category": category,
-                        "content": formatted_content
-                    }
+            # Check for exact word matches or phrase matches
+            if f" {keyword} " in f" {query_lower} " or query_lower.startswith(keyword) or query_lower.endswith(keyword):
+                # Prefer longer matches (more specific keywords)
+                if len(keyword) > best_match_length:
+                    best_match = category
+                    best_match_length = len(keyword)
+    
+    if best_match:
+        category = best_match
+        if category in UNIVERSITY_KB:
+            items = UNIVERSITY_KB[category]
+            content_list = []
+            if isinstance(items, dict):
+                for key, value in items.items():
+                    content_list.append(f"{key}: {value}")
+            formatted_content = " | ".join(content_list) if content_list else str(items)
+            logger.info(f"[KB] Matched '{query[:50]}' to category: {category}")
+            return {
+                "source": "University Knowledge",
+                "category": category,
+                "content": formatted_content
+            }
     
     # Second try direct category match
     for category, items in UNIVERSITY_KB.items():
@@ -508,6 +520,7 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
                 for key, value in items.items():
                     content_list.append(f"{key}: {value}")
             formatted_content = " | ".join(content_list) if content_list else str(items)
+            logger.info(f"[KB] Category match: {category}")
             return {
                 "source": "University Knowledge",
                 "category": category,
@@ -520,6 +533,7 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
             for key, value in items.items():
                 key_lower = key.lower().replace("_", " ")
                 if key_lower in query_lower or query_lower in key_lower:
+                    logger.info(f"[KB] Item match: {category}/{key}")
                     return {
                         "source": "University Knowledge",
                         "category": category,
@@ -527,6 +541,7 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
                         "content": f"{key}: {value}"
                     }
     
+    logger.debug(f"[KB] No match for: {query[:50]}")
     return None
 
 
