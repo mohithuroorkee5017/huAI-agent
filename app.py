@@ -328,64 +328,99 @@ class SearchService:
     """Web search via DuckDuckGo"""
     
     @staticmethod
-    def search(query: str, max_results: int = 3) -> List[Dict]:
-        """Search web with DuckDuckGo"""
+    def search(query: str, max_results: int = 5) -> List[Dict]:
+        """Search web with DuckDuckGo - enhanced for better results"""
         try:
             if DDGS is None:
                 logger.warning("DuckDuckGo search not available")
                 return []
             
             results = []
-            ddgs = DDGS()
-            search_results = ddgs.text(query, max_results=max_results, timelimit='y')
+            try:
+                ddgs = DDGS()
+                # Fetch more results to ensure quality
+                search_results = list(ddgs.text(query, max_results=max_results, timelimit='y'))
+                
+                for result in search_results:
+                    body = result.get("body", "").strip()
+                    title = result.get("title", "").strip()
+                    # Only include results with substantial content
+                    if body and len(body) > 30 and title:
+                        results.append({
+                            "type": "web",
+                            "source": "Web Search",
+                            "title": title,
+                            "content": body,
+                            "url": result.get("href", "")
+                        })
+                
+                if results:
+                    logger.info(f"[SEARCH] Found {len(results)} quality web results for: {query[:60]}")
+                else:
+                    logger.debug(f"[SEARCH] No quality results found for: {query[:60]}")
+            except Exception as ddgs_error:
+                logger.warning(f"[SEARCH] DuckDuckGo API error: {str(ddgs_error)}")
             
-            for result in search_results:
-                results.append({
-                    "type": "web",
-                    "source": "Web Search",
-                    "title": result.get("title", ""),
-                    "content": result.get("body", ""),
-                    "url": result.get("href", "")
-                })
-            
-            logger.info(f"Found {len(results)} web results for: {query}")
-            return results
+            return results[:max_results]
         
         except Exception as e:
-            logger.warning(f"Web search error: {str(e)}")
+            logger.error(f"[SEARCH] Web search error: {str(e)}")
             return []
 
 
 class WikipediaService:
-    """Wikipedia search"""
+    """Wikipedia search with multilingual support"""
     
     @staticmethod
     def search(query: str, language: str = "en") -> Optional[Dict]:
-        """Search Wikipedia"""
+        """Search Wikipedia with better content extraction"""
         try:
             if wikipedia is None:
-                logger.warning("Wikipedia not available")
+                logger.warning("[WIKI] Wikipedia not available")
                 return None
             
-            # Set language
-            wikipedia.set_lang('hi' if language == 'hi' else 'en')
+            # Map language codes to Wikipedia languages
+            wiki_lang = 'hi' if language in ['hi', 'hinglish'] else 'en'
+            wikipedia.set_lang(wiki_lang)
             
-            search_results = wikipedia.search(query, results=1)
-            if not search_results:
+            try:
+                search_results = wikipedia.search(query, results=3)
+                if not search_results:
+                    logger.debug(f"[WIKI] No Wikipedia results for: {query[:60]}")
+                    return None
+                
+                # Try each result until we get a good one
+                for search_result in search_results:
+                    try:
+                        page = wikipedia.page(search_result, auto_suggest=False)
+                        summary = page.summary
+                        
+                        # Ensure we have substantial content
+                        if summary and len(summary) > 50:
+                            logger.info(f"[WIKI] Found: {page.title} ({len(summary)} chars)")
+                            return {
+                                "type": "wikipedia",
+                                "source": "Wikipedia",
+                                "title": page.title,
+                                "content": summary[:600],  # Increased from 500
+                                "url": page.url
+                            }
+                    except wikipedia.exceptions.DisambiguationError:
+                        logger.debug(f"[WIKI] Disambiguation page for: {search_result}")
+                        continue
+                    except wikipedia.exceptions.PageError:
+                        logger.debug(f"[WIKI] Page not found: {search_result}")
+                        continue
+                
+                logger.warning(f"[WIKI] No valid Wikipedia page found for: {query[:60]}")
                 return None
-            
-            page = wikipedia.page(search_results[0])
-            
-            return {
-                "type": "wikipedia",
-                "source": "Wikipedia",
-                "title": page.title,
-                "content": page.summary[:500],
-                "url": page.url
-            }
+                
+            except Exception as e:
+                logger.error(f"[WIKI] Wikipedia search error: {str(e)}")
+                return None
         
         except Exception as e:
-            logger.debug(f"Wikipedia search error: {str(e)}")
+            logger.error(f"[WIKI] Wikipedia service error: {str(e)}")
             return None
 
 
@@ -496,9 +531,10 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
 
 
 def generate_response_from_sources(query: str, sources: List[Dict], language: str = "en") -> str:
-    """Generate a smart, natural response from gathered sources"""
+    """Generate a smart, natural response combining all available sources"""
     try:
         if not sources:
+            logger.warning("[RESPONSE] No sources available")
             if language == "hi":
                 return "मुझे इसके बारे में जानकारी नहीं मिल सकी। कृपया दूसरे तरीके से पूछें।"
             elif language == "hinglish":
@@ -506,59 +542,73 @@ def generate_response_from_sources(query: str, sources: List[Dict], language: st
             else:
                 return "I couldn't find information on that. Could you rephrase your question?"
         
-        # Extract the best response
-        best_response = ""
+        logger.info(f"[RESPONSE] Building response from {len(sources)} sources")
+        response_parts = []
         
-        # Priority 1: University Knowledge
-        for source in sources:
-            if source.get("source") == "University Knowledge":
+        # Priority 1: University Knowledge (most relevant for this university)
+        uni_sources = [s for s in sources if s.get("source") == "University Knowledge"]
+        if uni_sources:
+            for source in uni_sources:
                 content = source.get("content", "")
                 if content:
-                    # Clean up the content - remove dictionary formatting
                     content = str(content).strip()
-                    # Remove dictionary markers but keep the data
                     if content.startswith("{") and content.endswith("}"):
-                        # Parse dictionary-like string
                         try:
                             import ast
                             data = ast.literal_eval(content)
                             items = []
                             for k, v in data.items():
-                                items.append(f"• {k}: {v}")
-                            best_response = "\n".join(items)
+                                items.append(f"{k}: {v}")
+                            response_parts.append(" | ".join(items))
+                            logger.info("[RESPONSE] Using university knowledge")
                         except:
-                            # Fallback: just clean the string
-                            content = content.replace("{", "").replace("}", "").replace("'", "")
-                            best_response = content
+                            response_parts.append(content.replace("{", "").replace("}", "").replace("'", ""))
                     else:
-                        best_response = content
+                        response_parts.append(content)
+        
+        # Priority 2: Wikipedia
+        wiki_sources = [s for s in sources if "wikipedia" in s.get("source", "").lower()]
+        if wiki_sources and not response_parts:
+            for source in wiki_sources:
+                content = source.get("content", "").strip()
+                title = source.get("title", "")
+                if content and len(content) > 30:
+                    response_parts.append(content[:400])
+                    logger.info(f"[RESPONSE] Using Wikipedia: {title}")
                     break
         
-        # Priority 2: Wikipedia (if no university knowledge)
-        if not best_response:
-            for source in sources:
-                if source.get("title") == "Wikipedia" or "wiki" in source.get("source", "").lower():
-                    content = source.get("content", "")
-                    if content and len(str(content).strip()) > 30:
-                        best_response = str(content)[:400]
+        # Priority 3: Web Search (DuckDuckGo/Google)
+        web_sources = [s for s in sources if s.get("source") == "Web Search"]
+        if web_sources and not response_parts:
+            for source in web_sources[:2]:  # Use top 2 web results
+                content = source.get("content", "").strip()
+                title = source.get("title", "").strip()
+                if content and len(content) > 30 and title:
+                    response_parts.append(f"{title}: {content[:300]}")
+                    logger.info(f"[RESPONSE] Using web search: {title[:50]}")
+                    if len(response_parts) >= 2:
                         break
         
-        # Priority 3: Web search
-        if not best_response:
-            for source in sources:
-                content = source.get("content", "")
-                if content and len(str(content).strip()) > 30:
-                    best_response = str(content)[:400]
-                    break
+        # Combine all parts
+        best_response = " ".join(response_parts)
         
-        # Return the response
-        if best_response and len(best_response.strip()) > 15:
-            # Smart truncation for longer responses
-            if len(best_response) > 500:
-                best_response = best_response[:500].rsplit(".", 1)[0] + "."
+        if best_response and len(best_response.strip()) > 20:
+            # Smart truncation
+            if len(best_response) > 700:
+                best_response = best_response[:700].rsplit(" ", 1)[0] + "..."
+            logger.info(f"[RESPONSE] Returning {len(best_response)} char response")
             return best_response.strip()
         
-        # Fallback
+        # Fallback: Try any content
+        logger.warning("[RESPONSE] No good response built, using any available content")
+        for source in sources:
+            content = source.get("content", "").strip()
+            if content and len(content) > 30:
+                response_text = content[:400]
+                logger.info(f"[RESPONSE] Using fallback from {source.get('source')}")
+                return response_text
+        
+        # Final fallback
         if language == "hi":
             return "मुझे इस विषय पर कोई स्पष्ट जानकारी नहीं मिली। कृपया पुन: प्रयास करें।"
         elif language == "hinglish":
@@ -567,7 +617,7 @@ def generate_response_from_sources(query: str, sources: List[Dict], language: st
             return "I couldn't find clear information on this. Please try asking differently."
     
     except Exception as e:
-        logger.warning(f"Error generating response: {str(e)}")
+        logger.error(f"[RESPONSE] Error generating response: {str(e)}")
         return "Let me search for more information. Please try again."
 
 
@@ -750,7 +800,7 @@ def api_chat():
         if not user_message:
             return jsonify({'error': 'Message required'}), 400
         
-        logger.info(f"[CHAT] Processing: {user_message[:80]}")
+        logger.info(f"[CHAT] Processing message: {user_message[:70]}")
         
         # Detect language
         user_language = language_detector.detect_language(user_message)
@@ -759,32 +809,38 @@ def api_chat():
         # Get conversation history
         history = memory.get_history(conversation_id)
         
-        # Gather sources - ALWAYS try to collect data
+        # Gather sources from multiple sources
         sources = []
+        logger.info("[CHAT] Starting multi-source data gathering...")
         
         # 1. Check University Knowledge Base
-        uni_knowledge = get_university_knowledge(user_message)
-        if uni_knowledge:
-            sources.append(uni_knowledge)
-            logger.info("Added university knowledge source")
+        try:
+            uni_knowledge = get_university_knowledge(user_message)
+            if uni_knowledge:
+                sources.append(uni_knowledge)
+                logger.info(f"[SOURCES] Added university knowledge: {uni_knowledge.get('category', 'unknown')}")
+        except Exception as e:
+            logger.error(f"[SOURCES] University knowledge error: {str(e)}")
         
-        # 2. Check Wikipedia (always try)
+        # 2. Check Wikipedia (language-aware)
         try:
             wiki_result = wiki_service.search(user_message, user_language)
             if wiki_result:
                 sources.append(wiki_result)
-                logger.info("Added Wikipedia source")
+                logger.info(f"[SOURCES] Added Wikipedia: {wiki_result.get('title', 'N/A')}")
         except Exception as e:
-            logger.warning(f"Wikipedia search failed: {str(e)}")
+            logger.warning(f"[SOURCES] Wikipedia search failed: {str(e)}")
         
-        # 3. Web Search (always try for any query)
+        # 3. Web Search (DuckDuckGo/Google)
         try:
-            web_results = search_service.search(user_message, max_results=2)
+            web_results = search_service.search(user_message, max_results=5)
             if web_results:
                 sources.extend(web_results)
-                logger.info(f"Added {len(web_results)} web sources")
+                logger.info(f"[SOURCES] Added {len(web_results)} web search results")
         except Exception as e:
-            logger.warning(f"Web search failed: {str(e)}")
+            logger.error(f"[SOURCES] Web search failed: {str(e)}")
+        
+        logger.info(f"[CHAT] Total sources collected: {len(sources)}")
         
         # Try to get AI response
         ai_answer = None
@@ -797,7 +853,7 @@ def api_chat():
             )
             
             if success and ai_answer:
-                logger.info("Got AI response from OpenRouter")
+                logger.info(f"[CHAT] OpenRouter success")
             else:
                 logger.warning("OpenRouter returned no response, using fallback")
                 ai_answer = None
