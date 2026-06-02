@@ -1,0 +1,17 @@
+# Render.com deployment configuration for Haridwar University AI
+# Single Flask web service
+# Auto-deploys on GitHub push
+
+services:
+  - type: web
+    name: haridwar-university-ai
+    runtime: python
+    buildCommand: pip install -r requirements-unified.txt
+    startCommand: gunicorn -w 4 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: OPENROUTER_API_KEY
+        scope: project
