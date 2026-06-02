@@ -434,15 +434,22 @@ UNIVERSITY_KB = {
 
 
 def get_university_knowledge(query: str) -> Optional[Dict]:
-    """Search university knowledge base"""
+    """Search university knowledge base and format response nicely"""
     query_lower = query.lower()
     
     for category, items in UNIVERSITY_KB.items():
         if category in query_lower:
+            # Format category response nicely
+            content_list = []
+            if isinstance(items, dict):
+                for key, value in items.items():
+                    content_list.append(f"{key}: {value}")
+            formatted_content = " | ".join(content_list) if content_list else str(items)
+            
             return {
                 "source": "University Knowledge",
                 "category": category,
-                "content": str(items)
+                "content": formatted_content
             }
         
         for key, value in items.items():
@@ -451,14 +458,14 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
                     "source": "University Knowledge",
                     "category": category,
                     "key": key,
-                    "content": value
+                    "content": f"{key}: {value}"
                 }
     
     return None
 
 
 def generate_response_from_sources(query: str, sources: List[Dict], language: str = "en") -> str:
-    """Generate a smart response from gathered sources"""
+    """Generate a smart, natural response from gathered sources"""
     try:
         if not sources:
             if language == "hi":
@@ -470,42 +477,48 @@ def generate_response_from_sources(query: str, sources: List[Dict], language: st
         
         # Separate sources by type
         uni_sources = [s for s in sources if s.get("source") == "University Knowledge"]
-        other_sources = [s for s in sources if s.get("source") != "University Knowledge"]
+        wiki_sources = [s for s in sources if s.get("title") == "Wikipedia"]
+        web_sources = [s for s in sources if s.get("source") not in ["University Knowledge"] and s.get("title") != "Wikipedia"]
         
-        # Build response prioritizing university knowledge
-        response_parts = []
+        # Build response with priority to university knowledge
+        response_text = ""
         
-        # Add university knowledge first (most relevant)
-        for source in uni_sources:
-            content = source.get("content", "")
-            if isinstance(content, str) and len(content.strip()) > 10:
-                response_parts.append(content[:300])
+        # University knowledge takes priority
+        if uni_sources:
+            content = uni_sources[0].get("content", "")
+            if content and len(content.strip()) > 10:
+                # Clean up the content
+                content = content.replace("{'", "").replace("}'", "").replace("'", "")
+                response_text = content[:400]
         
-        # Add other sources (Wikipedia, web search)
-        for source in other_sources:
-            content = source.get("content", "")
-            title = source.get("title", "")
-            
-            if isinstance(content, str) and len(content.strip()) > 10:
-                # Filter out irrelevant short answers
-                if len(content) > 50:
-                    response_parts.append(content[:250])
+        # Add Wikipedia if no university source
+        if not response_text and wiki_sources:
+            content = wiki_sources[0].get("content", "")
+            if content and len(content.strip()) > 30:
+                response_text = content[:350]
         
-        if response_parts:
-            # Join and format response
-            combined = " ".join(response_parts)
+        # Add web search if still no response
+        if not response_text and web_sources:
+            for source in web_sources:
+                content = source.get("content", "")
+                if content and len(content.strip()) > 30:
+                    response_text = content[:350]
+                    break
+        
+        # Ensure we have a response
+        if response_text and len(response_text.strip()) > 20:
             # Smart truncation - keep complete sentences
-            if len(combined) > 600:
-                combined = combined[:600].rsplit(" ", 1)[0] + "..."
-            return combined
+            if len(response_text) > 500:
+                response_text = response_text[:500].rsplit(".", 1)[0] + "."
+            return response_text.strip()
         
-        # Fallback if no valid content
+        # Fallback if no valid content found
         if language == "hi":
-            return "कुछ जानकारी मिली लेकिन इसे सही से प्रोसेस नहीं कर सका। कृपया फिर से पूछें।"
+            return "मुझे इस विषय पर कोई स्पष्ट जानकारी नहीं मिली। क्या आप अपना सवाल विस्तार से बता सकते हैं?"
         elif language == "hinglish":
-            return "Kuch info mil gai but samajh nahi aa raha. Dobara try karo na?"
+            return "Mujhe iska sahi jawaab nahi mil paya. Thoda aur detail mein batao?"
         else:
-            return "I found some information. Could you provide more details about what you're looking for?"
+            return "I found some information but couldn't provide a clear answer. Could you give more details?"
     
     except Exception as e:
         logger.warning(f"Error generating response: {str(e)}")
