@@ -12,8 +12,18 @@ import html
 from datetime import datetime
 from dotenv import load_dotenv
 from pathlib import Path
-import speech_recognition as sr
-import pyttsx3
+
+# Voice features - optional
+try:
+    import speech_recognition as sr
+except Exception:
+    sr = None
+
+try:
+    import pyttsx3
+except Exception:
+    pyttsx3 = None
+
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from functools import wraps
 from bs4 import BeautifulSoup
@@ -44,11 +54,14 @@ class HUVoiceAgent:
         # Legacy webhook (optional fallback)
         self.webhook_url = webhook_url or os.getenv('WEBHOOK_URL')
         
-        # Audio components
-        self.recognizer = sr.Recognizer()
-        self.engine = pyttsx3.init()
-        self.engine.setProperty('rate', 150)
-        self.engine.setProperty('volume', 1.0)
+        # Audio components - optional
+        self.recognizer = sr.Recognizer() if sr else None
+        if pyttsx3:
+            self.engine = pyttsx3.init()
+            self.engine.setProperty('rate', 150)
+            self.engine.setProperty('volume', 1.0)
+        else:
+            self.engine = None
         
         # Agent identity
         self.agent_name = os.getenv('AGENT_NAME', 'HU Voice Agent')
