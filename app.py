@@ -18,8 +18,14 @@ from typing import Optional, Dict, List, Tuple
 from dotenv import load_dotenv
 import requests
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-import speech_recognition as sr
-import pyttsx3
+try:
+    import speech_recognition as sr
+except Exception:
+    sr = None
+try:
+    import pyttsx3
+except Exception:
+    pyttsx3 = None
 
 # AI/ML Libraries
 from langdetect import detect, LangDetectException
