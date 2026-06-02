@@ -102,18 +102,21 @@ async function sendMessage() {
         const data = await response.json();
         hideTypingIndicator();
         
-        if (data.success && data.response) {
-            const agentResponse = data.response.trim();
-            if (agentResponse) {
-                addMessage(agentResponse, 'agent');
-                scrollToBottom();
-                addToConversationHistory(message, agentResponse);
-            } else {
-                addMessage('I received your message but couldn\\'t generate a proper response. Please try again.', 'agent');
-            }
+        // Handle response - try "response" first, then "answer" for compatibility
+        const agentResponse = (data.response || data.answer || '').trim();
+        
+        if (agentResponse) {
+            addMessage(agentResponse, 'agent');
+            scrollToBottom();
+            addToConversationHistory(message, agentResponse);
+        } else if (data.success) {
+            // Success but no response text - show default
+            const fallback = 'I received your message but couldn\'t generate a proper response. Please try again.';
+            addMessage(fallback, 'agent');
         } else {
+            // Error response
             const errorMsg = data.error || data.message || 'Error processing your request. Please try again.';
-            addMessage(?? Lines{errorMsg}, 'agent');
+            addMessage('‚ùå ' + errorMsg, 'agent');
         }
     } catch (error) {
         console.error('Error sending message:', error);
@@ -203,7 +206,7 @@ function renderMarkdown(text) {
     html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="\" target="_blank">\</a>');
     html = html.replace(/\n\n/g, '</p><p>');
     html = '<p>' + html + '</p>';
-    html = html.replace(/^ï (.+)\$/gm, '<li>\</li>');
+    html = html.replace(/^ÔøΩ (.+)\$/gm, '<li>\</li>');
     html = html.replace(/(<li>.*<\/li>)/s, '<ul>\</ul>');
     html = html.replace(/^\d+\. (.+)\$/gm, '<li>\</li>');
     return html;

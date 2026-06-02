@@ -28,9 +28,21 @@ except Exception:
     pyttsx3 = None
 
 # AI/ML Libraries
-from langdetect import detect, LangDetectException
-import wikipedia
-from duckduckgo_search import DDGS
+try:
+    from langdetect import detect, LangDetectException
+except Exception:
+    detect = None
+    LangDetectException = Exception
+
+try:
+    import wikipedia
+except Exception:
+    wikipedia = None
+
+try:
+    from duckduckgo_search import DDGS
+except Exception:
+    DDGS = None
 
 # ============================================================================
 # CONFIGURATION
@@ -59,6 +71,17 @@ class LanguageDetector:
             if not text or len(text) < 2:
                 return "en"
             
+            if detect is None:
+                # Fallback: detect by character type
+                hindi_chars = any('\u0900' <= c <= '\u097F' for c in text)
+                english_chars = any(c.isalpha() and ord(c) < 128 for c in text)
+                
+                if hindi_chars and english_chars:
+                    return "hinglish"
+                elif hindi_chars:
+                    return "hi"
+                return "en"
+            
             detected = detect(text)
             
             # Hinglish detection (mixed Hindi-English)
@@ -72,8 +95,6 @@ class LanguageDetector:
             else:
                 return "en"
         
-        except LangDetectException:
-            return "en"
         except Exception as e:
             logger.warning(f"Language detection error: {str(e)}")
             return "en"
@@ -310,9 +331,13 @@ class SearchService:
     def search(query: str, max_results: int = 3) -> List[Dict]:
         """Search web with DuckDuckGo"""
         try:
+            if DDGS is None:
+                logger.warning("DuckDuckGo search not available")
+                return []
+            
             results = []
             ddgs = DDGS()
-            search_results = ddgs.text(query, max_results=max_results)
+            search_results = ddgs.text(query, max_results=max_results, timelimit='y')
             
             for result in search_results:
                 results.append({
@@ -338,6 +363,10 @@ class WikipediaService:
     def search(query: str, language: str = "en") -> Optional[Dict]:
         """Search Wikipedia"""
         try:
+            if wikipedia is None:
+                logger.warning("Wikipedia not available")
+                return None
+            
             # Set language
             wikipedia.set_lang('hi' if language == 'hi' else 'en')
             
@@ -426,6 +455,50 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
                 }
     
     return None
+
+
+def generate_response_from_sources(query: str, sources: List[Dict], language: str = "en") -> str:
+    """Generate a response from gathered sources when AI is unavailable"""
+    try:
+        if not sources:
+            if language == "hi":
+                return "मुझे इसके बारे में जानकारी नहीं मिल सकी। कृपया दूसरे तरीके से पूछें।"
+            elif language == "hinglish":
+                return "Mujhe iska answer nahi mil paya. Kya aap kuch aur puch sakte ho?"
+            else:
+                return "I couldn't find information on that. Could you rephrase your question?"
+        
+        # Extract content from sources
+        response_parts = []
+        
+        for source in sources:
+            content = source.get("content", "")
+            title = source.get("title") or source.get("category", "Information")
+            
+            if isinstance(content, str) and content.strip():
+                response_parts.append(content[:200])  # Limit each source to 200 chars
+        
+        if response_parts:
+            combined = " ".join(response_parts)
+            # Truncate to reasonable length
+            return combined[:500] if len(combined) > 500 else combined
+        
+        # Default response if no content
+        if language == "hi":
+            return "मुझे कुछ जानकारी मिली लेकिन इसे समझा नहीं पा रहा हूँ। कृपया फिर से पूछें।"
+        elif language == "hinglish":
+            return "Kuch information to mila hai lekin samajh nahi aa raha. Dobara try karo?"
+        else:
+            return "I found some information but couldn't process it properly. Please try again."
+    
+    except Exception as e:
+        logger.warning(f"Error generating fallback response: {str(e)}")
+        if language == "hi":
+            return "कृपया बाद में पुन: प्रयास करें।"
+        elif language == "hinglish":
+            return "Baad me dobara try karna please."
+        else:
+            return "Please try again later."
 
 
 # ============================================================================
@@ -597,6 +670,7 @@ def api_logout():
 def api_chat():
     """
     Main chat endpoint - MERGED FROM FASTAPI
+    Always responds with data from web, wiki, or university knowledge
     """
     try:
         data = request.json
@@ -615,7 +689,7 @@ def api_chat():
         # Get conversation history
         history = memory.get_history(conversation_id)
         
-        # Gather sources
+        # Gather sources - ALWAYS try to collect data
         sources = []
         
         # 1. Check University Knowledge Base
@@ -624,39 +698,58 @@ def api_chat():
             sources.append(uni_knowledge)
             logger.info("Added university knowledge source")
         
-        # 2. Check Wikipedia
-        wiki_result = wiki_service.search(user_message, user_language)
-        if wiki_result:
-            sources.append(wiki_result)
-            logger.info("Added Wikipedia source")
+        # 2. Check Wikipedia (always try)
+        try:
+            wiki_result = wiki_service.search(user_message, user_language)
+            if wiki_result:
+                sources.append(wiki_result)
+                logger.info("Added Wikipedia source")
+        except Exception as e:
+            logger.warning(f"Wikipedia search failed: {str(e)}")
         
-        # 3. Web Search for recent topics
-        if any(keyword in user_message.lower() for keyword in 
-               ["latest", "recent", "news", "current", "today", "2024", "2025"]):
+        # 3. Web Search (always try for any query)
+        try:
             web_results = search_service.search(user_message, max_results=2)
             if web_results:
                 sources.extend(web_results)
                 logger.info(f"Added {len(web_results)} web sources")
+        except Exception as e:
+            logger.warning(f"Web search failed: {str(e)}")
         
-        # Get AI response
-        ai_answer, success = openrouter_service.get_ai_response(
-            user_message=user_message,
-            conversation_history=history,
-            user_language=user_language,
-            sources=sources
-        )
+        # Try to get AI response
+        ai_answer = None
+        try:
+            ai_answer, success = openrouter_service.get_ai_response(
+                user_message=user_message,
+                conversation_history=history,
+                user_language=user_language,
+                sources=sources
+            )
+            
+            if success and ai_answer:
+                logger.info("Got AI response from OpenRouter")
+            else:
+                logger.warning("OpenRouter returned no response, using fallback")
+                ai_answer = None
         
-        if not success or not ai_answer:
-            logger.error("Failed to get AI response")
-            # Fallback to search
+        except Exception as e:
+            logger.warning(f"OpenRouter API failed: {str(e)}, using fallback")
+            ai_answer = None
+        
+        # Fallback: Generate response from gathered sources
+        if not ai_answer:
             try:
-                search_results = search_service.search(user_message, max_results=1)
-                if search_results:
-                    ai_answer = search_results[0].get('content', 'Sorry, I could not find information.')
+                ai_answer = generate_response_from_sources(user_message, sources, user_language)
+                logger.info("Generated response from gathered sources")
+            except Exception as e:
+                logger.error(f"Failed to generate fallback response: {str(e)}")
+                # Last resort fallback
+                if user_language == "hi":
+                    ai_answer = "मुझे माफ करें, मुझे इस समय उत्तर देने में समस्या हो रही है। कृपया बाद में पुन: प्रयास करें।"
+                elif user_language == "hinglish":
+                    ai_answer = "Sorry bhai! Abhi respond nahi kar pa raha. Thoda baad me dobara try karna."
                 else:
-                    ai_answer = "Sorry, I could not process your request. Please try again."
-            except:
-                ai_answer = "Sorry, I could not process your request. Please try again."
+                    ai_answer = "Sorry, I'm having trouble responding right now. Please try again later."
         
         # Store in memory
         memory.add_message(conversation_id, "user", user_message, user_language)
@@ -673,7 +766,8 @@ def api_chat():
         
         return jsonify({
             "success": True,
-            "answer": ai_answer,
+            "response": ai_answer,  # Changed from "answer" to "response" for consistency
+            "answer": ai_answer,     # Keep both for compatibility
             "sources": response_sources,
             "language": user_language,
             "conversation_id": conversation_id,
@@ -682,7 +776,18 @@ def api_chat():
     
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        # Even on critical error, return a response
+        if 'user' in session:
+            conversation_id = session['user']['email']
+        else:
+            conversation_id = "unknown"
+        
+        return jsonify({
+            'success': False,
+            'response': 'An error occurred while processing your request. Please try again.',
+            'error': str(e),
+            'conversation_id': conversation_id
+        }), 500
 
 
 @app.route('/api/ask', methods=['POST'])
@@ -800,7 +905,7 @@ def voice_input():
 
 @app.route('/webhook/<path:webhook_id>', methods=['POST', 'GET'])
 def webhook_handler(webhook_id):
-    """Webhook handler - public endpoint"""
+    """Webhook handler - public endpoint - always responds with data"""
     try:
         if request.method == 'POST':
             data = request.json or {}
@@ -818,16 +923,51 @@ def webhook_handler(webhook_id):
         user_language = language_detector.detect_language(question)
         history = memory.get_history(conversation_id)
         
-        # Get AI response
-        ai_answer, success = openrouter_service.get_ai_response(
-            user_message=question,
-            conversation_history=history,
-            user_language=user_language,
-            sources=[]
-        )
+        # Gather sources
+        sources = []
+        try:
+            uni_knowledge = get_university_knowledge(question)
+            if uni_knowledge:
+                sources.append(uni_knowledge)
+        except Exception as e:
+            logger.warning(f"University knowledge failed: {str(e)}")
         
-        if not success or not ai_answer:
-            ai_answer = "Sorry, I could not process your request."
+        try:
+            wiki_result = wiki_service.search(question, user_language)
+            if wiki_result:
+                sources.append(wiki_result)
+        except Exception as e:
+            logger.warning(f"Wikipedia failed: {str(e)}")
+        
+        try:
+            web_results = search_service.search(question, max_results=2)
+            if web_results:
+                sources.extend(web_results)
+        except Exception as e:
+            logger.warning(f"Web search failed: {str(e)}")
+        
+        # Try AI response
+        ai_answer = None
+        try:
+            ai_answer, success = openrouter_service.get_ai_response(
+                user_message=question,
+                conversation_history=history,
+                user_language=user_language,
+                sources=sources
+            )
+            if not success:
+                ai_answer = None
+        except Exception as e:
+            logger.warning(f"OpenRouter failed: {str(e)}")
+            ai_answer = None
+        
+        # Fallback
+        if not ai_answer:
+            try:
+                ai_answer = generate_response_from_sources(question, sources, user_language)
+            except Exception as e:
+                logger.error(f"Fallback failed: {str(e)}")
+                ai_answer = "Unable to process at this time."
         
         # Store in memory
         memory.add_message(conversation_id, "user", question, user_language)
@@ -837,12 +977,17 @@ def webhook_handler(webhook_id):
             'success': True,
             'question': question,
             'answer': ai_answer,
+            'response': ai_answer,
             'timestamp': datetime.now().isoformat()
         })
     
     except Exception as e:
         logger.error(f"Webhook error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'answer': 'Error processing request'
+        }), 500
 
 
 # ============================================================================
