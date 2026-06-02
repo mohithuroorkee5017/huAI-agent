@@ -475,59 +475,69 @@ def generate_response_from_sources(query: str, sources: List[Dict], language: st
             else:
                 return "I couldn't find information on that. Could you rephrase your question?"
         
-        # Separate sources by type
-        uni_sources = [s for s in sources if s.get("source") == "University Knowledge"]
-        wiki_sources = [s for s in sources if s.get("title") == "Wikipedia"]
-        web_sources = [s for s in sources if s.get("source") not in ["University Knowledge"] and s.get("title") != "Wikipedia"]
+        # Extract the best response
+        best_response = ""
         
-        # Build response with priority to university knowledge
-        response_text = ""
-        
-        # University knowledge takes priority
-        if uni_sources:
-            content = uni_sources[0].get("content", "")
-            if content and len(content.strip()) > 10:
-                # Clean up the content
-                content = content.replace("{'", "").replace("}'", "").replace("'", "")
-                response_text = content[:400]
-        
-        # Add Wikipedia if no university source
-        if not response_text and wiki_sources:
-            content = wiki_sources[0].get("content", "")
-            if content and len(content.strip()) > 30:
-                response_text = content[:350]
-        
-        # Add web search if still no response
-        if not response_text and web_sources:
-            for source in web_sources:
+        # Priority 1: University Knowledge
+        for source in sources:
+            if source.get("source") == "University Knowledge":
                 content = source.get("content", "")
-                if content and len(content.strip()) > 30:
-                    response_text = content[:350]
+                if content:
+                    # Clean up the content - remove dictionary formatting
+                    content = str(content).strip()
+                    # Remove dictionary markers but keep the data
+                    if content.startswith("{") and content.endswith("}"):
+                        # Parse dictionary-like string
+                        try:
+                            import ast
+                            data = ast.literal_eval(content)
+                            items = []
+                            for k, v in data.items():
+                                items.append(f"• {k}: {v}")
+                            best_response = "\n".join(items)
+                        except:
+                            # Fallback: just clean the string
+                            content = content.replace("{", "").replace("}", "").replace("'", "")
+                            best_response = content
+                    else:
+                        best_response = content
                     break
         
-        # Ensure we have a response
-        if response_text and len(response_text.strip()) > 20:
-            # Smart truncation - keep complete sentences
-            if len(response_text) > 500:
-                response_text = response_text[:500].rsplit(".", 1)[0] + "."
-            return response_text.strip()
+        # Priority 2: Wikipedia (if no university knowledge)
+        if not best_response:
+            for source in sources:
+                if source.get("title") == "Wikipedia" or "wiki" in source.get("source", "").lower():
+                    content = source.get("content", "")
+                    if content and len(str(content).strip()) > 30:
+                        best_response = str(content)[:400]
+                        break
         
-        # Fallback if no valid content found
+        # Priority 3: Web search
+        if not best_response:
+            for source in sources:
+                content = source.get("content", "")
+                if content and len(str(content).strip()) > 30:
+                    best_response = str(content)[:400]
+                    break
+        
+        # Return the response
+        if best_response and len(best_response.strip()) > 15:
+            # Smart truncation for longer responses
+            if len(best_response) > 500:
+                best_response = best_response[:500].rsplit(".", 1)[0] + "."
+            return best_response.strip()
+        
+        # Fallback
         if language == "hi":
-            return "मुझे इस विषय पर कोई स्पष्ट जानकारी नहीं मिली। क्या आप अपना सवाल विस्तार से बता सकते हैं?"
+            return "मुझे इस विषय पर कोई स्पष्ट जानकारी नहीं मिली। कृपया पुन: प्रयास करें।"
         elif language == "hinglish":
-            return "Mujhe iska sahi jawaab nahi mil paya. Thoda aur detail mein batao?"
+            return "Mujhe iska clear answer nahi mil paya. Dobara try karo?"
         else:
-            return "I found some information but couldn't provide a clear answer. Could you give more details?"
+            return "I couldn't find clear information on this. Please try asking differently."
     
     except Exception as e:
         logger.warning(f"Error generating response: {str(e)}")
-        if language == "hi":
-            return "कृपया बाद में पुन: प्रयास करें।"
-        elif language == "hinglish":
-            return "Baad mein dobara try karna please."
-        else:
-            return "Please try again later."
+        return "Let me search for more information. Please try again."
 
 
 # ============================================================================
