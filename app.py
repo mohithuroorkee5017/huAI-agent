@@ -458,7 +458,7 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
 
 
 def generate_response_from_sources(query: str, sources: List[Dict], language: str = "en") -> str:
-    """Generate a response from gathered sources when AI is unavailable"""
+    """Generate a smart response from gathered sources"""
     try:
         if not sources:
             if language == "hi":
@@ -468,35 +468,51 @@ def generate_response_from_sources(query: str, sources: List[Dict], language: st
             else:
                 return "I couldn't find information on that. Could you rephrase your question?"
         
-        # Extract content from sources
+        # Separate sources by type
+        uni_sources = [s for s in sources if s.get("source") == "University Knowledge"]
+        other_sources = [s for s in sources if s.get("source") != "University Knowledge"]
+        
+        # Build response prioritizing university knowledge
         response_parts = []
         
-        for source in sources:
+        # Add university knowledge first (most relevant)
+        for source in uni_sources:
             content = source.get("content", "")
-            title = source.get("title") or source.get("category", "Information")
+            if isinstance(content, str) and len(content.strip()) > 10:
+                response_parts.append(content[:300])
+        
+        # Add other sources (Wikipedia, web search)
+        for source in other_sources:
+            content = source.get("content", "")
+            title = source.get("title", "")
             
-            if isinstance(content, str) and content.strip():
-                response_parts.append(content[:200])  # Limit each source to 200 chars
+            if isinstance(content, str) and len(content.strip()) > 10:
+                # Filter out irrelevant short answers
+                if len(content) > 50:
+                    response_parts.append(content[:250])
         
         if response_parts:
+            # Join and format response
             combined = " ".join(response_parts)
-            # Truncate to reasonable length
-            return combined[:500] if len(combined) > 500 else combined
+            # Smart truncation - keep complete sentences
+            if len(combined) > 600:
+                combined = combined[:600].rsplit(" ", 1)[0] + "..."
+            return combined
         
-        # Default response if no content
+        # Fallback if no valid content
         if language == "hi":
-            return "मुझे कुछ जानकारी मिली लेकिन इसे समझा नहीं पा रहा हूँ। कृपया फिर से पूछें।"
+            return "कुछ जानकारी मिली लेकिन इसे सही से प्रोसेस नहीं कर सका। कृपया फिर से पूछें।"
         elif language == "hinglish":
-            return "Kuch information to mila hai lekin samajh nahi aa raha. Dobara try karo?"
+            return "Kuch info mil gai but samajh nahi aa raha. Dobara try karo na?"
         else:
-            return "I found some information but couldn't process it properly. Please try again."
+            return "I found some information. Could you provide more details about what you're looking for?"
     
     except Exception as e:
-        logger.warning(f"Error generating fallback response: {str(e)}")
+        logger.warning(f"Error generating response: {str(e)}")
         if language == "hi":
             return "कृपया बाद में पुन: प्रयास करें।"
         elif language == "hinglish":
-            return "Baad me dobara try karna please."
+            return "Baad mein dobara try karna please."
         else:
             return "Please try again later."
 
