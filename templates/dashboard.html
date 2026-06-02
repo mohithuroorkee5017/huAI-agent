@@ -7,131 +7,123 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <!-- Navbar -->
-        <nav class="navbar">
-            <div class="navbar-content">
-                <div class="navbar-left">
-                    <h2>🎤 HARIDWAR UNIVERSITY AI</h2>
+    <div class="app-container">
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">🎤 HU Voice AI</h1>
+                <button class="btn-new-chat" onclick="startNewConversation()" title="New Conversation">
+                    <span>➕</span> New Chat
+                </button>
+            </div>
+
+            <div class="sidebar-content">
+                <div class="history-section">
+                    <h3 class="history-title">Conversation History</h3>
+                    <div id="conversationHistory" class="history-list">
+                        <div class="empty-history">No conversations yet</div>
+                    </div>
                 </div>
-                <div class="navbar-right">
-                    <span id="user-display" class="user-info"></span>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-info-box">
+                    <span id="userDisplay" class="user-name">👤 User</span>
                     <button class="btn-logout" onclick="handleLogout()">Logout</button>
                 </div>
             </div>
-        </nav>
+        </aside>
 
-        <header class="header">
-            <div class="header-content">
-                <h1>🎤 HUVOICE AGENT</h1>
-                <p>Advanced Voice-Based AI Assistant</p>
-                <div class="status-indicator">
-                    <span id="status" class="status-badge">Initializing...</span>
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="chat-header">
+                <div class="header-left">
+                    <h1>HUVOICE AGENT</h1>
+                    <p class="header-subtitle">Advanced AI Assistant for Haridwar University</p>
+                </div>
+                <div class="header-right">
+                    <span id="statusBadge" class="status-badge">🟢 Online</span>
+                </div>
+            </header>
+
+            <!-- Chat Messages Container -->
+            <div class="chat-container">
+                <div id="messagesContainer" class="messages-area">
+                    <div class="welcome-banner">
+                        <h2>Welcome to HU Voice AI! 👋</h2>
+                        <p>Ask me anything about Haridwar University, courses, admissions, or general topics.</p>
+                        <div class="quick-prompts">
+                            <button class="prompt-btn" onclick="sendQuickPrompt('What are the courses offered by Haridwar University?')">
+                                📚 Courses
+                            </button>
+                            <button class="prompt-btn" onclick="sendQuickPrompt('How do I apply for admission?')">
+                                📝 Admission
+                            </button>
+                            <button class="prompt-btn" onclick="sendQuickPrompt('Tell me about campus facilities')">
+                                🏫 Campus
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Typing Indicator -->
+                <div id="typingIndicator" class="typing-indicator" style="display: none;">
+                    <div class="typing-bubble agent-typing">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
                 </div>
             </div>
-        </header>
 
-        <main class="main-content">
-            <!-- Control Panel -->
-            <section class="control-panel">
-                <div class="control-group">
-                    <button id="voiceBtn" class="btn btn-primary" onclick="toggleVoiceInput()">
-                        <span class="mic-icon">🎤</span> Voice Input
+            <!-- Input Area (Bottom) -->
+            <div class="input-area">
+                <div class="input-toolbar">
+                    <button class="toolbar-btn" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input (Ctrl+E)">
+                        <span>🎤</span>
                     </button>
-                    <button id="textBtn" class="btn btn-secondary" onclick="focusTextInput()">
-                        <span>⌨️</span> Type Question
+                    <button class="toolbar-btn" onclick="document.getElementById('imageInput').click()" title="Send Image">
+                        <span>🖼️</span>
+                    </button>
+                    <button class="toolbar-btn" onclick="clearConversation()" title="Clear History (Ctrl+L)">
+                        <span>🗑️</span>
                     </button>
                 </div>
-            </section>
 
-            <!-- Input Section -->
-            <section class="input-section">
-                <div class="input-group">
+                <div class="input-wrapper">
                     <input 
                         type="text" 
-                        id="questionInput" 
-                        class="input-field" 
-                        placeholder="Ask me anything... or use voice input"
-                        onkeypress="handleKeyPress(event)"
+                        id="messageInput" 
+                        class="message-input" 
+                        placeholder="Ask anything... (Shift+Enter for new line)"
+                        onkeypress="handleInputKeyPress(event)"
                     >
-                    <div class="button-group">
-                        <button class="btn btn-image-upload" onclick="document.getElementById('imageInput').click()" title="Send Image">
-                            <span class="image-icon">🖼️</span>
-                        </button>
-                        <button class="btn btn-submit" onclick="submitQuestion()">
-                            <span class="mic-icon">🎤</span> Send
-                        </button>
-                    </div>
-                    <input 
-                        type="file" 
-                        id="imageInput" 
-                        class="hidden-file-input" 
-                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp"
-                        onchange="handleImageSelect(event)"
-                        style="display: none;"
-                    >
+                    <button class="btn-send" onclick="sendMessage()" title="Send (Enter)">
+                        <span>→</span>
+                    </button>
                 </div>
-                <div id="imagePreview" class="image-preview-container" style="display: none;">
-                    <img id="previewImg" src="" alt="Preview" class="preview-image">
-                    <button class="btn-remove-preview" onclick="removeImagePreview()">✕</button>
-                </div>
-                <div class="input-hint">
-                    💡 Tip: Ask any question and I'll search Google for the answer! Or send an image for analysis.
-                </div>
-            </section>
 
-            <!-- Conversation Display -->
-            <section class="conversation-section">
-                <div class="conversation-header">
-                    <h3>Conversation</h3>
-                    <button class="btn-small" onclick="clearConversation()">Clear History</button>
+                <div id="imagePreview" class="image-preview" style="display: none;">
+                    <img id="previewImage" src="" alt="Preview">
+                    <button class="btn-remove-image" onclick="removeImagePreview()">✕</button>
                 </div>
-                <div id="conversation" class="conversation-box">
-                    <div class="welcome-message">
-                        <p>👋 Welcome to HUVOICE AGENT</p>
-                        <p>I can search Google and answer your questions. Ask me anything!</p>
-                    </div>
-                </div>
-            </section>
 
-            <!-- Live Transcript -->
-            <section class="transcript-section">
-                <h3>Last Transcript</h3>
-                <div id="transcript" class="transcript-box">
-                    <p class="transcript-empty">No transcripts yet...</p>
-                </div>
-            </section>
+                <input 
+                    type="file" 
+                    id="imageInput" 
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp"
+                    onchange="handleImageSelect(event)"
+                    style="display: none;"
+                >
+            </div>
         </main>
 
-        <!-- Loading Indicator -->
-        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-            <div class="spinner"></div>
-            <p>Processing...</p>
-        </div>
+        <!-- Mobile Sidebar Toggle -->
+        <button class="mobile-sidebar-toggle" onclick="toggleSidebar()">☰</button>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-    <script>
-        // Display logged-in user
-        window.addEventListener('DOMContentLoaded', function() {
-            const userDisplay = document.getElementById('user-display');
-            const userData = localStorage.getItem('user');
-            if (userData) {
-                const user = JSON.parse(userData);
-                userDisplay.textContent = `👤 ${user.fullname || user.email}`;
-            }
-        });
-
-        // Logout function
-        function handleLogout() {
-            if (confirm('Are you sure you want to logout?')) {
-                fetch('/api/logout', { method: 'POST' })
-                    .then(() => {
-                        localStorage.removeItem('user');
-                        window.location.href = '/';
-                    });
-            }
-        }
-    </script>
 </body>
 </html>
