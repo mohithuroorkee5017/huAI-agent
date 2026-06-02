@@ -1,0 +1,49 @@
+{
+  "agent": {
+    "name": "HARIDWAR UNIVERSITY AI",
+    "version": "1.0.0",
+    "description": "Advanced Voice-Based AI Assistant",
+    "author": "Haridwar University Development",
+    "created": "2026-05-25"
+  },
+  "features": {
+    "voice_input": true,
+    "voice_output": true,
+    "google_search": true,
+    "conversation_history": true,
+    "web_interface": true,
+    "api_endpoints": true
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": true,
+    "threaded": true
+  },
+  "voice": {
+    "speech_rate": 150,
+    "volume": 1.0,
+    "recognition_timeout": 10,
+    "language": "en-US"
+  },
+  "search": {
+    "max_results": 3,
+    "result_length": 500,
+    "timeout": 10
+  },
+  "api": {
+    "version": "1.0",
+    "base_url": "/api",
+    "endpoints": [
+      "/ask",
+      "/voice-input",
+      "/history",
+      "/status",
+      "/clear-history"
+    ]
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "[%(levelname)s] %(message)s"
+  }
+}

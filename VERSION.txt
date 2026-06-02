@@ -1,0 +1,108 @@
+╔════════════════════════════════════════╗
+║      HUVOICE AGENT - Version Info      ║
+╚════════════════════════════════════════╝
+
+NAME: HUVOICE AGENT
+VERSION: 1.0.0
+RELEASE DATE: May 25, 2026
+STATUS: Stable
+
+DESCRIPTION:
+Advanced Voice-Based AI Assistant that fetches Google data
+and answers every question with voice input/output capabilities.
+
+KEY FEATURES:
+✓ Voice Input Recognition
+✓ Voice Output (Text-to-Speech)
+✓ Google Search Integration
+✓ Web Interface
+✓ RESTful API
+✓ Conversation History
+✓ Real-time Status Monitoring
+✓ Multi-platform Support (Windows/Mac/Linux)
+
+TECHNOLOGIES:
+- Python 3.8+
+- Flask Web Framework
+- SpeechRecognition Library
+- pyttsx3 Text-to-Speech
+- BeautifulSoup Web Scraping
+- HTML5/CSS3/JavaScript Frontend
+
+API KEY:
+sk-or-v1-YOUR_KEY_HERE
+
+DEPLOYMENT:
+- Local: http://localhost:5000
+- API Base: http://localhost:5000/api
+
+COMPONENTS:
+1. Main Application (huvoice_agent.py)
+2. Web Interface (templates/index.html)
+3. Styling (static/style.css)
+4. Frontend Logic (static/script.js)
+5. Configuration (.env, config.json)
+6. Documentation (README.md, API_DOCUMENTATION.md)
+7. Setup Tools (setup.py, test_setup.py)
+8. Startup Scripts (run.bat, run.sh)
+
+REQUIREMENTS:
+- Flask 2.3.3
+- Requests 2.31.0
+- SpeechRecognition 3.10.0
+- pyttsx3 2.90
+- BeautifulSoup4 4.12.2
+- python-dotenv 1.0.0
+
+SYSTEM REQUIREMENTS:
+- Python 3.8 or higher
+- 100MB disk space
+- 512MB RAM minimum
+- Internet connection
+- Microphone (optional, for voice features)
+
+CHANGELOG:
+
+v1.0.0 (May 25, 2026)
+- Initial release
+- Voice input/output integration
+- Google search functionality
+- Web interface with real-time conversation
+- RESTful API endpoints
+- Conversation history tracking
+- Status monitoring
+- Multi-platform support
+
+KNOWN LIMITATIONS:
+- Voice recognition requires internet (Google Speech API)
+- Google searches may be throttled with excessive requests
+- Conversation history is in-memory only (resets on restart)
+- Single microphone session at a time
+- Answer extraction is best-effort based on Google results
+
+FUTURE ENHANCEMENTS:
+- Database persistence for conversation history
+- Multi-language support
+- Intent recognition and NLP
+- Integration with other search engines
+- Sentiment analysis
+- Custom command support
+- Machine learning model integration
+- Cloud deployment support
+
+SUPPORT:
+For issues, check:
+1. QUICKSTART.md - Quick setup guide
+2. README.md - Full documentation
+3. API_DOCUMENTATION.md - API reference
+4. test_setup.py - Diagnostic tests
+
+LICENSE:
+Created for educational and personal use.
+
+AUTHOR:
+HUVoice Development Team
+
+═════════════════════════════════════════
+Generated: May 25, 2026
+═════════════════════════════════════════

@@ -1,0 +1,74 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "38f72ae7-8140-4887-b3b5-ce7e118f7c13"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5000/api/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParametersJson": "={\n  \"question\": $json.question,\n  \"user\": $json.user || \"anonymous\"\n}",
+        "responseFormat": "json"
+      },
+      "id": "huvoice-request",
+      "name": "Call HUVOICE Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "content": "Question: {{$json.question}}\n\nAgent Response:\n{{$json.answer}}\n\nTimestamp: {{$json.timestamp}}"
+      },
+      "id": "response",
+      "name": "Return Answer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "connections": {}
+    }
+  ],
+  "connections": {
+    "webhook": {
+      "main": [
+        [
+          {
+            "node": "huvoice-request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "huvoice-request": {
+      "main": [
+        [
+          {
+            "node": "response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "triggerOrder": ["webhook"]
+}
