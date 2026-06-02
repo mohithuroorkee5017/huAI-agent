@@ -252,7 +252,7 @@ GENERAL BEHAVIOR:
         user_message: str,
         conversation_history: List[Dict],
         user_language: str,
-        sources: List[Dict] = None
+        sources: Optional[List[Dict]] = None
     ) -> Tuple[Optional[str], bool]:
         """Get AI response from OpenRouter"""
         try:
@@ -918,6 +918,9 @@ def upload_image():
             return jsonify({'error': 'No file selected'}), 400
         
         prompt = request.form.get('prompt', None)
+        if not file.filename:
+            return jsonify({'error': 'No filename provided'}), 400
+        
         logger.info(f"[IMAGE] Received file: {file.filename}")
         
         # Save temporary file

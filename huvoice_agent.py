@@ -86,8 +86,11 @@ class HUVoiceAgent:
         """Convert text to speech"""
         try:
             logger.info(f"[SPEAKING] {text[:80]}")
-            self.engine.say(text)
-            self.engine.runAndWait()
+            if self.engine:
+                self.engine.say(text)
+                self.engine.runAndWait()
+            else:
+                logger.info("[SPEAKING] pyttsx3 not available, skipping audio output")
         except Exception as e:
             logger.error(f"Error in speech: {str(e)}")
     
@@ -676,6 +679,11 @@ Respond naturally like a real friend. Never act like a dictionary."""
     def listen(self):
         """Listen for voice input"""
         try:
+            if not sr or not self.recognizer:
+                logger.warning("[LISTENING] speech_recognition not available")
+                self.is_listening = False
+                return None
+            
             self.is_listening = True
             logger.info("[LISTENING] Waiting for voice input...")
             
@@ -688,18 +696,18 @@ Respond naturally like a real friend. Never act like a dictionary."""
             self.is_listening = False
             return text
             
-        except sr.UnknownValueError:
-            response = "Sorry, I didn't catch that. Could you say it again?"
-            self.speak(response)
-            self.is_listening = False
-            return None
-        except sr.RequestError as e:
-            logger.error(f"Speech API error: {str(e)}")
-            self.speak("There's an issue with the speech service")
-            self.is_listening = False
-            return None
         except Exception as e:
-            logger.error(f"Listening error: {str(e)}")
+            error_type = type(e).__name__
+            if sr and hasattr(sr, 'UnknownValueError') and isinstance(e, sr.UnknownValueError):
+                response = "Sorry, I didn't catch that. Could you say it again?"
+                self.speak(response)
+            elif sr and hasattr(sr, 'RequestError') and isinstance(e, sr.RequestError):
+                logger.error(f"Speech API error: {str(e)}")
+                self.speak("There's an issue with the speech service")
+            else:
+                logger.error(f"Listening error: {str(e)}")
+            self.is_listening = False
+            return None
             self.is_listening = False
             return None
     
@@ -962,7 +970,7 @@ def upload_image():
         
         file = request.files['file']
         
-        if file.filename == '':
+        if not file.filename or file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
         # Get optional prompt
