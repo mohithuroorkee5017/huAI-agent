@@ -434,32 +434,65 @@ UNIVERSITY_KB = {
 
 
 def get_university_knowledge(query: str) -> Optional[Dict]:
-    """Search university knowledge base and format response nicely"""
+    """Search university knowledge base with flexible matching"""
     query_lower = query.lower()
     
+    # Define keywords for each category
+    keyword_mapping = {
+        "admission": ["admission", "apply", "enroll", "register", "join", "entry"],
+        "engineering": ["engineering", "btech", "btec", "course", "program", "branch"],
+        "management": ["mba", "management", "business", "course", "program"],
+        "science": ["science", "bsc", "physics", "chemistry", "math"],
+        "arts": ["arts", "ba", "humanities", "language", "history"],
+        "fees": ["fee", "fees", "cost", "tuition", "charge", "price"],
+        "scholarship": ["scholarship", "financial", "aid", "grant", "fund"],
+        "placement": ["placement", "job", "recruit", "company", "career"],
+        "campus": ["campus", "facility", "building", "hostel", "dorm"],
+    }
+    
+    # First try category-level matching
     for category, items in UNIVERSITY_KB.items():
-        if category in query_lower:
-            # Format category response nicely
+        category_lower = category.lower()
+        
+        # Direct category match
+        if category_lower in query_lower or query_lower in category_lower:
             content_list = []
             if isinstance(items, dict):
                 for key, value in items.items():
                     content_list.append(f"{key}: {value}")
             formatted_content = " | ".join(content_list) if content_list else str(items)
-            
             return {
                 "source": "University Knowledge",
                 "category": category,
                 "content": formatted_content
             }
         
-        for key, value in items.items():
-            if key in query_lower or key.replace("_", " ") in query_lower:
+        # Keyword-based matching
+        for keyword in keyword_mapping.get(category_lower, []):
+            if keyword in query_lower:
+                content_list = []
+                if isinstance(items, dict):
+                    for key, value in items.items():
+                        content_list.append(f"{key}: {value}")
+                formatted_content = " | ".join(content_list) if content_list else str(items)
                 return {
                     "source": "University Knowledge",
                     "category": category,
-                    "key": key,
-                    "content": f"{key}: {value}"
+                    "content": formatted_content
                 }
+    
+    # Second try specific item matching
+    for category, items in UNIVERSITY_KB.items():
+        if isinstance(items, dict):
+            for key, value in items.items():
+                key_lower = key.lower().replace("_", " ")
+                if key_lower in query_lower or query_lower in key_lower:
+                    return {
+                        "source": "University Knowledge",
+                        "category": category,
+                        "key": key,
+                        "content": f"{key}: {value}"
+                    }
     
     return None
 
