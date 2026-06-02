@@ -437,24 +437,36 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
     """Search university knowledge base with flexible matching"""
     query_lower = query.lower()
     
-    # Define keywords for each category
+    # Define keywords for each category in UNIVERSITY_KB
     keyword_mapping = {
-        "admission": ["admission", "apply", "enroll", "register", "join", "entry"],
-        "engineering": ["engineering", "btech", "btec", "course", "program", "branch"],
-        "management": ["mba", "management", "business", "course", "program"],
-        "science": ["science", "bsc", "physics", "chemistry", "math"],
-        "arts": ["arts", "ba", "humanities", "language", "history"],
-        "fees": ["fee", "fees", "cost", "tuition", "charge", "price"],
-        "scholarship": ["scholarship", "financial", "aid", "grant", "fund"],
-        "placement": ["placement", "job", "recruit", "company", "career"],
-        "campus": ["campus", "facility", "building", "hostel", "dorm"],
+        "admissions": ["admission", "apply", "enroll", "register", "join", "entry", "eligibility", "deadline", "exam"],
+        "courses": ["course", "program", "engineering", "btech", "mba", "management", "bsc", "science", "ba", "arts"],
+        "placements": ["placement", "job", "recruit", "company", "career", "package", "salary"],
+        "scholarships": ["scholarship", "financial", "aid", "grant", "fund", "fee", "waiver"],
+        "hostel": ["hostel", "accommodation", "dorm", "mess", "facility", "housing", "stay"],
+        "fees": ["fee", "fees", "cost", "tuition", "charge", "price", "expense"],
     }
     
-    # First try category-level matching
+    # First try keyword-based matching for categories
+    for category, keywords in keyword_mapping.items():
+        for keyword in keywords:
+            if keyword in query_lower:
+                if category in UNIVERSITY_KB:
+                    items = UNIVERSITY_KB[category]
+                    content_list = []
+                    if isinstance(items, dict):
+                        for key, value in items.items():
+                            content_list.append(f"{key}: {value}")
+                    formatted_content = " | ".join(content_list) if content_list else str(items)
+                    return {
+                        "source": "University Knowledge",
+                        "category": category,
+                        "content": formatted_content
+                    }
+    
+    # Second try direct category match
     for category, items in UNIVERSITY_KB.items():
         category_lower = category.lower()
-        
-        # Direct category match
         if category_lower in query_lower or query_lower in category_lower:
             content_list = []
             if isinstance(items, dict):
@@ -466,22 +478,8 @@ def get_university_knowledge(query: str) -> Optional[Dict]:
                 "category": category,
                 "content": formatted_content
             }
-        
-        # Keyword-based matching
-        for keyword in keyword_mapping.get(category_lower, []):
-            if keyword in query_lower:
-                content_list = []
-                if isinstance(items, dict):
-                    for key, value in items.items():
-                        content_list.append(f"{key}: {value}")
-                formatted_content = " | ".join(content_list) if content_list else str(items)
-                return {
-                    "source": "University Knowledge",
-                    "category": category,
-                    "content": formatted_content
-                }
     
-    # Second try specific item matching
+    # Third try specific item matching
     for category, items in UNIVERSITY_KB.items():
         if isinstance(items, dict):
             for key, value in items.items():
