@@ -7,11 +7,18 @@ services:
     # Build: Install dependencies from root requirements.txt
     buildCommand: pip install -r requirements.txt
 
-    # Start: Run unified server (includes frontend + API)
+    # Start: Run unified FastAPI server (NOT Flask app.py)
     startCommand: python server.py
+
+    # Port configuration
+    port: 5000
 
     # Environment variables
     envVars:
+      # Port configuration
+      - key: PORT
+        value: "5000"
+      
       # Critical: OpenRouter API Key (set in Render dashboard)
       - key: OPENROUTER_API_KEY
         sync: false
