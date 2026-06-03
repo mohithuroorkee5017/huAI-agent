@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     <title>HARIDWAR UNIVERSITY AI - Voice AI Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="../static/style.css">
 </head>
 <body>
     <!-- FLEX CONTAINER: Uses 100dvh (dynamic viewport height) instead of 100vh for proper mobile keyboard handling -->
@@ -32,11 +32,11 @@
             <!-- Control buttons panel - fixed within scrollable area -->
             <section class="control-panel">
                 <div class="button-group">
-                    <button class="btn btn-voice" onclick="toggleVoiceInput()" id="voiceBtn">
+                    <button class="btn btn-voice" onclick="toggleVoiceInput()" id="voiceBtn" aria-label="Voice input">
                         <span class="btn-icon">🎤</span>
                         <span class="btn-text">Voice</span>
                     </button>
-                    <button class="btn btn-text-input" onclick="focusTextInput()" id="textBtn">
+                    <button class="btn btn-text-input" onclick="focusTextInput()" id="textBtn" aria-label="Text input">
                         <span class="btn-icon">⌨️</span>
                         <span class="btn-text">Type</span>
                     </button>
@@ -88,8 +88,14 @@
                         autocomplete="off"
                         autocorrect="off"
                         spellcheck="false"
+                        aria-label="Message input field"
                     >
-                    <button class="btn btn-submit" onclick="submitQuestion()" id="submitBtn">
+                    <button 
+                        class="btn btn-submit" 
+                        onclick="submitQuestion()" 
+                        id="submitBtn"
+                        aria-label="Send message"
+                    >
                         <span class="submit-icon">➤</span>
                     </button>
                 </div>
@@ -98,14 +104,26 @@
             <!-- Safe area padding for notched devices (iPhone X+, Android phones with notches) -->
             <div class="safe-area-bottom"></div>
         </footer>
-
-        <!-- Loading Indicator - positioned above all content -->
-        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-            <div class="spinner"></div>
-            <p>Processing...</p>
-        </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <!-- LOADING INDICATOR: Shows while processing messages -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>Processing your message...</p>
+    </div>
+
+    <!-- TOAST NOTIFICATIONS: For showing errors, success, and info messages -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- CHAT HISTORY STORAGE: Hidden element for storing serialized conversation history -->
+    <div id="chatHistoryStorage" style="display: none;"></div>
+
+    <!-- Loading Indicator - positioned above all content -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <script src="../static/script.js"></script>
 </body>
 </html>

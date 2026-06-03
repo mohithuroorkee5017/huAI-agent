@@ -1,4 +1,4 @@
-﻿/* ========================================================================
+/* ========================================================================
    HARIDWAR UNIVERSITY AI - COMPREHENSIVE SCRIPT WITH ALL FIXES
    ========================================================================
    IMPROVEMENTS:
@@ -31,7 +31,7 @@
    ======================================================================== */
 
 const CONFIG = {
-    API_BASE_URL: 'http://127.0.0.1:8000',  // Backend API endpoint
+    API_BASE_URL: window.location.origin,
     API_TIMEOUT: 30000,  // 30 seconds
     MAX_RETRIES: 3,
     RETRY_DELAY: 1000,   // 1 second base delay
@@ -170,6 +170,52 @@ function loadChatHistory() {
     }
 }
 
+function clearChatHistory() {
+    if (!confirm('Clear all conversations? This cannot be undone.')) {
+        return;
+    }
+    
+    debugLog('🗑️  Clearing conversation history...');
+    
+    // Clear memory
+    AppState.messageHistory = [];
+    
+    // Clear storage
+    localStorage.removeItem(CONFIG.CHAT_HISTORY_KEY);
+    localStorage.removeItem(CONFIG.CONVERSATION_ID_KEY);
+    
+    // Reset conversation
+    AppState.conversationId = generateConversationId();
+    localStorage.setItem(CONFIG.CONVERSATION_ID_KEY, AppState.conversationId);
+    
+    // Clear UI
+    const conversation = document.getElementById('conversation');
+    if (conversation) {
+        conversation.innerHTML = `
+            <div class="welcome-message">
+                <h2>Welcome to HU Voice AI! 👋</h2>
+                <p>I'm your intelligent university assistant. Ask me anything about:</p>
+                <ul class="welcome-topics">
+                    <li>📚 Courses & Admissions</li>
+                    <li>🏫 Campus Information</li>
+                    <li>🎓 Career Guidance</li>
+                    <li>💡 General Knowledge</li>
+                </ul>
+                <p class="welcome-hint">Use voice or text input below to get started!</p>
+            </div>
+        `;
+    }
+    
+    // Clear transcript
+    const transcript = document.getElementById('transcript');
+    if (transcript) {
+        transcript.innerHTML = '<p class="transcript-empty">📝 No transcripts yet...</p>';
+    }
+    
+    debugLog('✅ Conversation cleared');
+    showToast('Conversation cleared ✓', 'success');
+}
+
 /* ========================================================================
    INPUT & MESSAGE HANDLING
    ======================================================================== */
@@ -291,7 +337,7 @@ async function sendMessageWithRetry(message, retryCount = 0) {
         debugLog('📤 Sending message (attempt ' + (retryCount + 1) + '/' + CONFIG.MAX_RETRIES + '): ' + message.substring(0, 50) + '...');
         
         const response = await fetchWithTimeout(
-            CONFIG.API_BASE_URL + '/chat',
+            CONFIG.API_BASE_URL + '/api/chat',
             {
                 method: 'POST',
                 headers: {
@@ -526,7 +572,7 @@ async function updateStatus() {
         debugLog('🔍 Checking API status...');
         
         const response = await fetchWithTimeout(
-            CONFIG.API_BASE_URL + '/status',
+            CONFIG.API_BASE_URL + '/api/status',
             {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
@@ -764,4 +810,3 @@ console.log('%cViewport Width: ' + window.innerWidth + 'px', 'color: #8b5cf6');
 console.log('%cDevice Pixel Ratio: ' + window.devicePixelRatio, 'color: #8b5cf6');
 console.log('%cFeatures: Toast Notifications, Chat History, Retry Logic, Timeouts, Error Handling', 'color: #10b981');
 console.log('%cDebug Logs Available in Browser Console', 'color: #f59e0b');
-
