@@ -31,7 +31,8 @@
    ======================================================================== */
 
 const CONFIG = {
-    API_BASE_URL: 'http://127.0.0.1:8000',  // Backend API endpoint
+    // Use current origin + /api for API calls (supports both unified and separate servers)
+    API_BASE_URL: `${window.location.protocol}//${window.location.host}/api`,
     API_TIMEOUT: 30000,  // 30 seconds
     MAX_RETRIES: 3,
     RETRY_DELAY: 1000,   // 1 second base delay
