@@ -5,14 +5,21 @@ Serves both frontend (static files) and backend API on the same port
 
 import sys
 import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+# Get absolute paths for all resources
+SCRIPT_DIR = Path(__file__).parent.resolve()
+STATIC_DIR = SCRIPT_DIR / "static"
+TEMPLATES_DIR = SCRIPT_DIR / "templates"
+API_DIR = SCRIPT_DIR / "api"
+
 # Add api to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'api'))
+sys.path.insert(0, str(API_DIR))
 
 from api.main import app as api_app
 
@@ -28,8 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static files using absolute path
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Mount API under /api prefix to avoid route conflicts
 app.mount("/api", api_app)
@@ -37,7 +44,10 @@ app.mount("/api", api_app)
 # Serve index.html for root and SPA routes
 @app.get("/")
 async def root():
-    return FileResponse("templates/index.html", media_type="text/html")
+    index_path = TEMPLATES_DIR / "index.html"
+    if not index_path.exists():
+        return {"error": "index.html not found", "path": str(index_path)}
+    return FileResponse(str(index_path), media_type="text/html")
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
@@ -45,12 +55,15 @@ async def serve_spa(full_path: str):
     if full_path.startswith("api/") or full_path.startswith("static/"):
         return {"error": "Not found"}
     
-    file_path = os.path.join("templates", full_path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
+    file_path = TEMPLATES_DIR / full_path
+    if file_path.is_file():
+        return FileResponse(str(file_path))
     
     # Default to index.html for SPA routing
-    return FileResponse("templates/index.html", media_type="text/html")
+    index_path = TEMPLATES_DIR / "index.html"
+    if not index_path.exists():
+        return {"error": "index.html not found"}
+    return FileResponse(str(index_path), media_type="text/html")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
