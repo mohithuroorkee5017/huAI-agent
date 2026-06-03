@@ -3,20 +3,29 @@ services:
     name: huvoice-ai-app
     runtime: python
     pythonVersion: 3.11
+    
+    # Build: Install dependencies from root requirements.txt
+    buildCommand: pip install -r requirements.txt
 
-    buildCommand: cd api && pip install -r requirements.txt
+    # Start: Run unified server (includes frontend + API)
+    startCommand: python server.py
 
-    startCommand: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT
-
+    # Environment variables
     envVars:
+      # Critical: OpenRouter API Key (set in Render dashboard)
       - key: OPENROUTER_API_KEY
         sync: false
       
+      # API Configuration
       - key: OPENROUTER_MODEL
         value: openai/gpt-4o-mini
       
       - key: CORS_ORIGINS
         value: "*"
       
+      # Environment
       - key: DEBUG
         value: "false"
+      
+      - key: HOST
+        value: 0.0.0.0
