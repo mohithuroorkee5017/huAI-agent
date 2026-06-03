@@ -182,28 +182,43 @@ function setupInputListener() {
         return;
     }
     
-    // Handle Enter key
+    // Handle Enter key - IMPROVED: Better mobile support
     input.addEventListener('keypress', function(event) {
+        // Only submit on Enter (not Shift+Enter for multiline)
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
+            event.stopPropagation();
+            debugLog('⌨️  Enter key pressed');
             submitQuestion();
         }
     });
     
-    // Prevent form submission
+    // Also handle keydown for reliability on some mobile devices
     input.addEventListener('keydown', function(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
+            event.stopPropagation();
         }
     });
     
     // Ensure input is accessible when focused
     input.addEventListener('focus', function() {
         debugLog('⌨️  Input focused');
-        // On mobile, scroll the input into view
+        // On mobile, scroll the input into view with a small delay
         setTimeout(() => {
-            this.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 300);
+            try {
+                this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {
+                // Fallback for older browsers
+                this.scrollIntoView(true);
+            }
+        }, 100);
+    });
+    
+    // Track input changes for better UX
+    input.addEventListener('input', function() {
+        // Could add character counter or input validation here
+        debugLog('⌨️  Input value changed: ' + this.value.length + ' characters');
     });
     
     debugLog('✅ Input listener setup complete');
@@ -216,11 +231,33 @@ function setupSubmitButton() {
         return;
     }
     
-    // Add click handler (inline handler also exists in HTML)
+    // Add click handler with prevent double-click
+    let lastClickTime = 0;
     button.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        
+        // Prevent rapid double-clicking
+        const now = Date.now();
+        if (now - lastClickTime < 500) {
+            debugLog('⚠️  Double-click prevented', 'warning');
+            return;
+        }
+        lastClickTime = now;
+        
         debugLog('📤 Submit button clicked');
+        submitQuestion();
+    });
+    
+    // Also add touch event for better mobile response
+    button.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        this.style.transform = 'scale(0.95)';
+    });
+    
+    button.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        this.style.transform = 'scale(1)';
         submitQuestion();
     });
     
@@ -462,6 +499,8 @@ function showLoadingIndicator() {
     const loader = document.getElementById('loadingIndicator');
     if (loader) {
         loader.style.display = 'flex';
+        loader.style.visibility = 'visible';
+        loader.style.opacity = '1';
         debugLog('✅ Loading indicator shown');
     } else {
         debugLog('⚠️  Loading indicator element not found', 'warning');
@@ -472,6 +511,8 @@ function hideLoadingIndicator() {
     const loader = document.getElementById('loadingIndicator');
     if (loader) {
         loader.style.display = 'none';
+        loader.style.visibility = 'hidden';
+        loader.style.opacity = '0';
         debugLog('✅ Loading indicator hidden');
     }
 }
