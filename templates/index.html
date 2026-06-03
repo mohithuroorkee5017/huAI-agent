@@ -2,78 +2,104 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CRITICAL: Use viewport-fit=cover for notch support and prevent scaling issues -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
     <title>HARIDWAR UNIVERSITY AI - Voice AI Assistant</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header class="header">
+    <!-- FLEX CONTAINER: Uses 100dvh (dynamic viewport height) instead of 100vh for proper mobile keyboard handling -->
+    <div class="app-wrapper">
+        <!-- FIXED HEADER: Shrinks to content size, never grows -->
+        <header class="app-header">
             <div class="header-content">
-                <h1>🎤 HARIDWAR UNIVERSITY AI</h1>
-                <p>Advanced Voice-Based AI Assistant</p>
+                <div class="header-title">
+                    <h1>🎤 HU VOICE AI</h1>
+                    <p class="header-subtitle">University Assistant</p>
+                </div>
+                <!-- Status indicator with proper z-index -->
                 <div class="status-indicator">
-                    <span id="status" class="status-badge">Initializing...</span>
+                    <span id="status" class="status-badge">🟢 Online</span>
                 </div>
             </div>
         </header>
 
-        <main class="main-content">
-            <!-- Control Panel -->
+        <!-- SCROLLABLE MAIN CONTENT: Takes remaining space, scrolls independently -->
+        <main class="app-main">
+            <!-- Control buttons panel - fixed within scrollable area -->
             <section class="control-panel">
-                <div class="control-group">
-                    <button id="voiceBtn" class="btn btn-primary" onclick="toggleVoiceInput()">
-                        <span class="mic-icon">🎤</span> Voice Input
+                <div class="button-group">
+                    <button class="btn btn-voice" onclick="toggleVoiceInput()" id="voiceBtn">
+                        <span class="btn-icon">🎤</span>
+                        <span class="btn-text">Voice</span>
                     </button>
-                    <button id="textBtn" class="btn btn-secondary" onclick="focusTextInput()">
-                        <span>⌨️</span> Type Question
+                    <button class="btn btn-text-input" onclick="focusTextInput()" id="textBtn">
+                        <span class="btn-icon">⌨️</span>
+                        <span class="btn-text">Type</span>
                     </button>
                 </div>
             </section>
 
-            <!-- Input Section -->
-            <section class="input-section">
+            <!-- Conversation Display - scrollable messages area -->
+            <section class="conversation-section">
+                <div id="conversation" class="conversation-box">
+                    <div class="welcome-message">
+                        <h2>Welcome to HU Voice AI! 👋</h2>
+                        <p>I'm your intelligent university assistant. Ask me anything about:</p>
+                        <ul class="welcome-topics">
+                            <li>📚 Courses & Admissions</li>
+                            <li>🏫 Campus Information</li>
+                            <li>🎓 Career Guidance</li>
+                            <li>💡 General Knowledge</li>
+                        </ul>
+                        <p class="welcome-hint">Use voice or text input below to get started!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Last Transcript Display -->
+            <section class="transcript-section">
+                <h3>Last Transcript</h3>
+                <div id="transcript" class="transcript-box">
+                    <p class="transcript-empty">📝 No transcripts yet...</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- STICKY FOOTER: Input area that stays above keyboard on mobile -->
+        <footer class="app-footer">
+            <!-- Input hint message (hides on small screens) -->
+            <div class="input-hint">
+                💡 Tip: Ask any question and I'll search for the answer!
+            </div>
+
+            <!-- Main input container with proper mobile spacing -->
+            <div class="input-container">
                 <div class="input-group">
                     <input 
                         type="text" 
                         id="questionInput" 
                         class="input-field" 
-                        placeholder="Ask me anything... or use voice input"
+                        placeholder="Ask me anything..."
                         onkeypress="handleKeyPress(event)"
+                        autocomplete="off"
+                        autocorrect="off"
+                        spellcheck="false"
                     >
-                    <button class="btn btn-submit" onclick="submitQuestion()">
-                        <span class="mic-icon">🎤</span> Send
+                    <button class="btn btn-submit" onclick="submitQuestion()" id="submitBtn">
+                        <span class="submit-icon">➤</span>
                     </button>
                 </div>
-                <div class="input-hint">
-                    💡 Tip: Ask any question and I'll search Google for the answer!
-                </div>
-            </section>
+            </div>
 
-            <!-- Conversation Display -->
-            <section class="conversation-section">
-                <div class="conversation-header">
-                    <h3>Conversation</h3>
-                    <button class="btn-small" onclick="clearConversation()">Clear History</button>
-                </div>
-                <div id="conversation" class="conversation-box">
-                    <div class="welcome-message">
-                        <p>👋 Welcome to HUVOICE AGENT</p>
-                        <p>I can search Google and answer your questions. Ask me anything!</p>
-                    </div>
-                </div>
-            </section>
+            <!-- Safe area padding for notched devices (iPhone X+, Android phones with notches) -->
+            <div class="safe-area-bottom"></div>
+        </footer>
 
-            <!-- Live Transcript -->
-            <section class="transcript-section">
-                <h3>Last Transcript</h3>
-                <div id="transcript" class="transcript-box">
-                    <p class="transcript-empty">No transcripts yet...</p>
-                </div>
-            </section>
-        </main>
-
-        <!-- Loading Indicator -->
+        <!-- Loading Indicator - positioned above all content -->
         <div id="loadingIndicator" class="loading-indicator" style="display: none;">
             <div class="spinner"></div>
             <p>Processing...</p>

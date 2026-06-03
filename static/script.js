@@ -1,207 +1,424 @@
-﻿// HARIDWAR UNIVERSITY AI - Modern Dashboard Script
+﻿/* ========================================================================
+   HARIDWAR UNIVERSITY AI - MOBILE RESPONSIVE SCRIPT
+   ========================================================================
+   Updates for new mobile-responsive HTML structure:
+   - Element ID mappings updated
+   - Keyboard handling improved
+   - Mobile viewport management
+   - Focus management for accessibility
+   ======================================================================== */
 
+// Global state
 let isRecording = false;
-let conversationActive = false;
+let isLoading = false;
+
+/* ========================================================================
+   INITIALIZATION
+   ======================================================================== */
 
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-    setupEventListeners();
-    loadUserInfo();
+    console.log('🎤 Initializing HU Voice AI...');
+    
+    // Setup event listeners
+    setupInputListener();
+    
+    // Update status
     updateStatus();
-    setInterval(updateStatus, 5000);
+    updateStatusPeriodically();
+    
+    // Handle viewport changes
+    setupViewportHandlers();
+    
+    // Prevent pinch zoom on mobile
+    preventPinchZoom();
+    
+    console.log('✅ Initialization complete');
 });
 
-function initializeApp() {
-    const messagesContainer = document.getElementById('messagesContainer');
-    if (messagesContainer && !messagesContainer.querySelector('.welcome-banner')) {
-        showWelcomeBanner();
-    }
-}
+/* ========================================================================
+   INPUT & MESSAGE HANDLING
+   ======================================================================== */
 
-function setupEventListeners() {
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput) {
-        messageInput.addEventListener('keypress', handleInputKeyPress);
-    }
-}
-
-function loadUserInfo() {
-    const userDisplay = document.getElementById('userDisplay');
-    const userData = localStorage.getItem('user');
-    if (userData) {
-        try {
-            const user = JSON.parse(userData);
-            userDisplay.textContent = '👤 ' + (user.fullname || user.email);
-        } catch (e) {
-            userDisplay.textContent = '👤 User';
+function setupInputListener() {
+    const input = document.getElementById('questionInput');
+    if (!input) return;
+    
+    // Handle Enter key
+    input.addEventListener('keypress', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            submitQuestion();
         }
-    }
+    });
+    
+    // Ensure input is accessible when focused
+    input.addEventListener('focus', function() {
+        // On mobile, scroll the input into view
+        setTimeout(() => {
+            this.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 300);
+    });
 }
 
-async function updateStatus() {
+function submitQuestion() {
+    const input = document.getElementById('questionInput');
+    if (!input) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+    
+    // Prevent duplicate submissions
+    if (isLoading) return;
+    
+    isLoading = true;
+    
+    // Add user message to conversation
+    addMessageToConversation(message, 'user');
+    
+    // Clear input
+    input.value = '';
+    
+    // Blur input to hide mobile keyboard
+    input.blur();
+    
+    // Show loading state
+    showLoadingIndicator();
+    
+    // Send to backend
+    sendMessageToBackend(message);
+}
+
+async function sendMessageToBackend(message) {
     try {
-        const response = await fetch('/api/status');
-        if (!response.ok) throw new Error('Status check failed');
-        const data = await response.json();
-        const statusBadge = document.getElementById('statusBadge');
-        if (statusBadge) {
-            statusBadge.textContent = data.status === 'active' ? '🟢 Online' : '🔴 Offline';
-        }
-    } catch (error) {
-        console.error('Status update failed:', error);
-    }
-}
-
-function handleInputKeyPress(event) {
-    if (event.key === 'Enter') {
-        if (event.shiftKey) return true;
-        event.preventDefault();
-        sendMessage();
-    }
-}
-
-async function sendMessage() {
-    const messageInput = document.getElementById('messageInput');
-    const imageInput = document.getElementById('imageInput');
-    const message = messageInput.value.trim();
-    
-    if (!message && imageInput.files.length === 0) {
-        return;
-    }
-    
-    addMessage(message, 'user');
-    messageInput.value = '';
-    showTypingIndicator();
-    
-    try {
+        console.log('📤 Sending message:', message.substring(0, 50) + '...');
+        
         const response = await fetch('/api/chat', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({message: message})
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: message,
+                user_id: 'web_user'
+            })
         });
         
-        const data = await response.json();
-        hideTypingIndicator();
-        
-        const agentResponse = (data.response || data.answer || '').trim();
-        
-        if (agentResponse) {
-            addMessage(agentResponse, 'agent');
-            scrollToBottom();
-        } else {
-            addMessage('Unable to process your request. Please try again.', 'agent');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        
+        const data = await response.json();
+        console.log('📥 Response received');
+        
+        // Extract answer from response
+        const answer = data.answer || data.response || 'Unable to process your request.';
+        
+        // Add agent message
+        addMessageToConversation(answer, 'agent');
+        
+        // Scroll to latest message
+        scrollConversationToBottom();
+        
     } catch (error) {
-        console.error('Error sending message:', error);
-        hideTypingIndicator();
-        addMessage('Network error. Please check your connection.', 'agent');
+        console.error('❌ Error sending message:', error);
+        
+        // Add error message
+        const errorMsg = 'Sorry, I encountered an error. Please check your connection and try again.';
+        addMessageToConversation(errorMsg, 'agent');
+        scrollConversationToBottom();
+        
+    } finally {
+        hideLoadingIndicator();
+        isLoading = false;
+        
+        // Re-focus input for continued interaction
+        const input = document.getElementById('questionInput');
+        if (input) input.focus();
     }
 }
 
-function addMessage(text, sender) {
-    const messagesContainer = document.getElementById('messagesContainer');
-    if (!messagesContainer) return;
+function addMessageToConversation(text, sender) {
+    const conversation = document.getElementById('conversation');
+    if (!conversation) return;
     
-    const welcomeBanner = messagesContainer.querySelector('.welcome-banner');
-    if (welcomeBanner && sender === 'user') welcomeBanner.remove();
+    // Remove welcome message on first user message
+    if (sender === 'user') {
+        const welcome = conversation.querySelector('.welcome-message');
+        if (welcome) welcome.remove();
+    }
     
+    // Create message element
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'message ' + sender + '-message';
+    messageDiv.className = `message ${sender}-message`;
     
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     bubble.textContent = text;
     
     messageDiv.appendChild(bubble);
-    messagesContainer.appendChild(messageDiv);
-    scrollToBottom();
-}
-
-function scrollToBottom() {
-    const messagesContainer = document.getElementById('messagesContainer');
-    if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-}
-
-function showTypingIndicator() {
-    const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.style.display = 'block';
-    }
-}
-
-function hideTypingIndicator() {
-    const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.style.display = 'none';
-    }
-}
-
-function clearConversation() {
-    if (!confirm('Clear all conversations?')) return;
-    fetch('/api/clear-history', {method: 'POST'}).then(() => {
-        const messagesContainer = document.getElementById('messagesContainer');
-        if (messagesContainer) {
-            messagesContainer.innerHTML = '';
-            showWelcomeBanner();
-        }
-    });
-}
-
-function startNewConversation() {
-    clearConversation();
-}
-
-function showWelcomeBanner() {
-    const messagesContainer = document.getElementById('messagesContainer');
-    if (!messagesContainer) return;
+    conversation.appendChild(messageDiv);
     
-    const banner = document.createElement('div');
-    banner.className = 'welcome-banner';
-    banner.innerHTML = '<h2>Welcome to HU Voice AI! 👋</h2><p>Ask me anything about Haridwar University, courses, admissions, or general topics.</p>';
-    
-    messagesContainer.appendChild(banner);
+    // Scroll to bottom
+    scrollConversationToBottom();
 }
 
-function sendQuickPrompt(prompt) {
-    const messageInput = document.getElementById('messageInput');
-    messageInput.value = prompt;
-    sendMessage();
-}
-
-function toggleSidebar() {
-    const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
-        sidebar.classList.toggle('active');
+function scrollConversationToBottom() {
+    const conversation = document.getElementById('conversation');
+    if (conversation) {
+        // Use setTimeout to ensure DOM has updated
+        setTimeout(() => {
+            conversation.scrollTop = conversation.scrollHeight;
+        }, 0);
     }
 }
 
-function closeSidebarOnMobile() {
-    if (window.innerWidth < 768) {
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar) {
-            sidebar.classList.remove('active');
+/* ========================================================================
+   UI VISIBILITY & FEEDBACK
+   ======================================================================== */
+
+function showLoadingIndicator() {
+    const loader = document.getElementById('loadingIndicator');
+    if (loader) {
+        loader.style.display = 'flex';
+    }
+}
+
+function hideLoadingIndicator() {
+    const loader = document.getElementById('loadingIndicator');
+    if (loader) {
+        loader.style.display = 'none';
+    }
+}
+
+async function updateStatus() {
+    try {
+        const response = await fetch('/api/status', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const badge = document.getElementById('status');
+            if (badge) {
+                badge.textContent = data.status === 'active' 
+                    ? '🟢 Online' 
+                    : '🔴 Offline';
+            }
         }
+    } catch (error) {
+        console.warn('⚠️ Status check failed:', error);
     }
 }
 
-function handleLogout() {
-    if (!confirm('Logout?')) return;
-    fetch('/api/logout', {method: 'POST'}).then(() => {
-        window.location.href = '/';
-    });
+function updateStatusPeriodically() {
+    // Update status every 30 seconds
+    setInterval(updateStatus, 30000);
 }
+
+/* ========================================================================
+   VOICE INPUT HANDLING
+   ======================================================================== */
 
 function toggleVoiceInput() {
-    console.log('Voice input not available');
+    if (isRecording) {
+        stopVoiceRecording();
+    } else {
+        startVoiceRecording();
+    }
 }
 
-function handleImageSelect(event) {
-    console.log('Image upload not available in web');
+function startVoiceRecording() {
+    console.log('🎤 Voice recording requested...');
+    
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert('Speech Recognition not supported in your browser');
+        return;
+    }
+    
+    isRecording = true;
+    const btn = document.getElementById('voiceBtn');
+    if (btn) {
+        btn.classList.add('recording');
+        btn.textContent = '⏹️ Stop Recording';
+    }
+    
+    console.log('🎙️ Voice recording started');
+    // Additional voice recording logic would go here
 }
 
-function removeImagePreview() {
-    const imagePreview = document.getElementById('imagePreview');
-    if (imagePreview) imagePreview.style.display = 'none';
+function stopVoiceRecording() {
+    console.log('⏹️ Voice recording stopped');
+    isRecording = false;
+    
+    const btn = document.getElementById('voiceBtn');
+    if (btn) {
+        btn.classList.remove('recording');
+        btn.textContent = '🎤 Voice';
+    }
 }
+
+/* ========================================================================
+   TEXT INPUT FOCUS
+   ======================================================================== */
+
+function focusTextInput() {
+    const input = document.getElementById('questionInput');
+    if (input) {
+        input.focus();
+        // On mobile, this will trigger keyboard opening
+        // The footer is sticky so it will stay above the keyboard
+    }
+}
+
+/* ========================================================================
+   CONVERSATION MANAGEMENT
+   ======================================================================== */
+
+function clearConversation() {
+    if (!confirm('Clear all conversations? This cannot be undone.')) {
+        return;
+    }
+    
+    console.log('🗑️ Clearing conversation history...');
+    
+    const conversation = document.getElementById('conversation');
+    if (conversation) {
+        conversation.innerHTML = `
+            <div class="welcome-message">
+                <h2>Welcome to HU Voice AI! 👋</h2>
+                <p>I'm your intelligent university assistant. Ask me anything about:</p>
+                <ul class="welcome-topics">
+                    <li>📚 Courses & Admissions</li>
+                    <li>🏫 Campus Information</li>
+                    <li>🎓 Career Guidance</li>
+                    <li>💡 General Knowledge</li>
+                </ul>
+                <p class="welcome-hint">Use voice or text input below to get started!</p>
+            </div>
+        `;
+    }
+    
+    // Clear transcript
+    const transcript = document.getElementById('transcript');
+    if (transcript) {
+        transcript.innerHTML = '<p class="transcript-empty">📝 No transcripts yet...</p>';
+    }
+    
+    console.log('✅ Conversation cleared');
+}
+
+/* ========================================================================
+   VIEWPORT & MOBILE HANDLING
+   ======================================================================== */
+
+function setupViewportHandlers() {
+    // Handle orientation changes
+    window.addEventListener('orientationchange', () => {
+        console.log('📱 Orientation changed to:', window.orientation);
+        // Allow time for DOM to adjust
+        setTimeout(() => {
+            const input = document.getElementById('questionInput');
+            if (input) input.focus();
+        }, 200);
+    });
+    
+    // Handle resize
+    window.addEventListener('resize', () => {
+        // Scroll footer into view when keyboard opens
+        const footer = document.querySelector('.app-footer');
+        if (footer && window.innerHeight < window.screen.height) {
+            // Keyboard is likely open
+            footer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    });
+}
+
+function preventPinchZoom() {
+    // Prevent pinch zoom on mobile (better for fixed layouts)
+    document.addEventListener('touchmove', function(event) {
+        if (event.touches.length > 1) {
+            event.preventDefault();
+        }
+    }, false);
+}
+
+/* ========================================================================
+   KEYBOARD MANAGEMENT
+   ======================================================================== */
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        if (event.shiftKey) {
+            // Shift+Enter: new line (allow default)
+            return;
+        }
+        // Enter alone: send message
+        event.preventDefault();
+        submitQuestion();
+    }
+}
+
+/* ========================================================================
+   MOBILE KEYBOARD DETECTION
+   ========================================================================
+   Detects when mobile keyboard opens/closes
+   ======================================================================== */
+
+const originalHeight = window.innerHeight;
+
+window.addEventListener('resize', () => {
+    const currentHeight = window.innerHeight;
+    
+    // If height decreased significantly, keyboard is likely open
+    if (currentHeight < originalHeight - 100) {
+        console.log('⌨️ Keyboard appears to be open');
+        // Ensure footer stays visible
+        const footer = document.querySelector('.app-footer');
+        if (footer) {
+            // Small delay to let browser finish layout
+            setTimeout(() => {
+                footer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+    }
+});
+
+/* ========================================================================
+   ACCESSIBILITY HELPERS
+   ======================================================================== */
+
+// Add aria-labels for better screen reader support
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('questionInput');
+    if (input && !input.getAttribute('aria-label')) {
+        input.setAttribute('aria-label', 'Message input field');
+    }
+    
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn && !submitBtn.getAttribute('aria-label')) {
+        submitBtn.setAttribute('aria-label', 'Send message');
+    }
+    
+    const voiceBtn = document.getElementById('voiceBtn');
+    if (voiceBtn && !voiceBtn.getAttribute('aria-label')) {
+        voiceBtn.setAttribute('aria-label', 'Voice input');
+    }
+    
+    const textBtn = document.getElementById('textBtn');
+    if (textBtn && !textBtn.getAttribute('aria-label')) {
+        textBtn.setAttribute('aria-label', 'Text input');
+    }
+});
+
+/* ========================================================================
+   DEBUG LOGGING
+   ======================================================================== */
+
+console.log('%c🎤 HU Voice AI - Mobile Responsive', 'color: #6366f1; font-size: 14px; font-weight: bold;');
+console.log('%cViewport Height: ' + window.innerHeight, 'color: #8b5cf6');
+console.log('%cViewport Width: ' + window.innerWidth, 'color: #8b5cf6');
+console.log('%cDevice Pixel Ratio: ' + window.devicePixelRatio, 'color: #8b5cf6');
+
